@@ -1,5 +1,6 @@
 
 #import "RNPaypal.h"
+#import "PPDataCollector.h"
 
 @implementation RNPaypal {
 }
@@ -80,6 +81,46 @@ RCT_EXPORT_METHOD(
             }
         }];
     });
+}
+
+RCT_EXPORT_METHOD(
+    requestVaultCredentials:(NSString *)clientToken
+    resolve:(RCTPromiseResolveBlock)resolve
+    reject:(RCTPromiseRejectBlock)reject)
+{
+    // Example: Initialize BTAPIClient, if you haven't already
+    BTAPIClient* braintreeClient = [[BTAPIClient alloc] initWithAuthorization: clientToken];
+    BTPayPalDriver *payPalDriver = [[BTPayPalDriver alloc] initWithAPIClient: braintreeClient];
+    payPalDriver.viewControllerPresentingDelegate = self;
+    payPalDriver.appSwitchDelegate = self; // Optional
+
+    BTPayPalRequest *checkout = [[BTPayPalRequest alloc] init];
+    checkout.billingAgreementDescription = @"Your agreement description";
+    [payPalDriver requestBillingAgreement:checkout completion:^(BTPayPalAccountNonce * _Nullable tokenizedPayPalCheckout, NSError * _Nullable error) {
+        if (error) {
+            reject(@"error", error.localizedDescription, error);
+        } else if (tokenizedPayPalCheckout) {
+            NSDictionary* result = @{
+                                     @"nonce" : (tokenizedPayPalCheckout.nonce ?: [NSNull null]),
+                                     @"payerId" : (tokenizedPayPalCheckout.payerId  ?: [NSNull null]),
+                                     @"email" : (tokenizedPayPalCheckout.email  ?: [NSNull null]),
+                                     @"firstName" : (tokenizedPayPalCheckout.firstName  ?: [NSNull null]),
+                                     @"lastName" : (tokenizedPayPalCheckout.lastName  ?: [NSNull null]),
+                                     @"phone" : (tokenizedPayPalCheckout.phone  ?: [NSNull null]),
+                                     };
+            resolve(result);
+        } else {
+            reject(@"cancelled", @"Cancelled", error);
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(
+    getDeviceData:(RCTPromiseResolveBlock)resolve
+    reject:(RCTPromiseRejectBlock)reject)
+{
+    NSString *deviceData = [PPDataCollector collectPayPalDeviceData];
+    resolve(deviceData);
 }
 
 - (BOOL)application:(UIApplication *)application
